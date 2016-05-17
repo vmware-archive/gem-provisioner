@@ -1,6 +1,21 @@
 {
   "AWSTemplateFormatVersion": "2010-09-09",
   "Resources": {
+    "{{ EnvironmentName }}PlacementGroup": {
+      "Type" : "AWS::EC2::PlacementGroup",
+      "Properties" : {
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "{{ EnvironmentName }}PlacementGroup"
+          },
+          {
+            "Key": "Environment",
+            "Value": "{{ EnvironmentName }}"
+          }
+        ]
+      }
+    },
     "{{ EnvironmentName }}VPC": {
       "Type": "AWS::EC2::VPC",
       "Properties": {
@@ -139,6 +154,9 @@
         "InstanceType": "{{ Server.InstanceType }}",
         "KeyName": "{{ KeyPair }}",
         "Monitoring": "false",
+        "PlacementGroupName": {
+          "Ref" : "{{ EnvironmentName }}PlacementGroup"
+        },
         "NetworkInterfaces": [
           {
             "DeleteOnTermination": "true",
@@ -284,8 +302,7 @@
         "IpProtocol": "-1",
         "SourceSecurityGroupId": {
           "Ref": "{{ EnvironmentName }}SecurityGroup"
-        },
-        "SourceSecurityGroupOwnerId": "284816546669"
+        }
       }
     },
     "ingress2": {
@@ -323,5 +340,5 @@
       }
     }
   },
-  "Description": "{{ EnvironmentName }} Stack"
+  "Description": "{{ EnvironmentName }} stack"
 }
