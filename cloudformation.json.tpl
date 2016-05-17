@@ -74,24 +74,6 @@
         ]
       }
     },
-    "{{ EnvironmentName }}NetworkAcl": {
-      "Type": "AWS::EC2::NetworkAcl",
-      "Properties": {
-        "VpcId": {
-          "Ref": "{{ EnvironmentName }}VPC"
-        },
-        "Tags": [
-          {
-            "Key": "Name",
-            "Value": "{{ EnvironmentName }}NetworkAcl"
-          },
-          {
-            "Key": "Environment",
-            "Value": "{{ EnvironmentName }}"
-          }
-        ]
-      }
-    },
     "{{ EnvironmentName }}RouteTable1": {
       "Type": "AWS::EC2::RouteTable",
       "Properties": {
@@ -193,42 +175,6 @@
         ]
       }
     },
-    "acl3": {
-      "Type": "AWS::EC2::NetworkAclEntry",
-      "Properties": {
-        "CidrBlock": "0.0.0.0/0",
-        "Egress": "true",
-        "Protocol": "-1",
-        "RuleAction": "allow",
-        "RuleNumber": "100",
-        "NetworkAclId": {
-          "Ref": "{{ EnvironmentName }}NetworkAcl"
-        }
-      }
-    },
-    "acl4": {
-      "Type": "AWS::EC2::NetworkAclEntry",
-      "Properties": {
-        "CidrBlock": "0.0.0.0/0",
-        "Protocol": "-1",
-        "RuleAction": "allow",
-        "RuleNumber": "100",
-        "NetworkAclId": {
-          "Ref": "{{ EnvironmentName }}NetworkAcl"
-        }
-      }
-    },
-    "subnetacl2": {
-      "Type": "AWS::EC2::SubnetNetworkAclAssociation",
-      "Properties": {
-        "NetworkAclId": {
-          "Ref": "{{ EnvironmentName }}NetworkAcl"
-        },
-        "SubnetId": {
-          "Ref": "{{ EnvironmentName }}SubnetPublic"
-        }
-      }
-    },
     "gw2": {
       "Type": "AWS::EC2::VPCGatewayAttachment",
       "Properties": {
@@ -275,40 +221,15 @@
         }
       }
     },
-    "ingress1": {
-      "Type": "AWS::EC2::SecurityGroupIngress",
-      "Properties": {
-        "GroupId": {
-          "Ref": "{{ EnvironmentName }}SecurityGroup"
-        },
-        "IpProtocol": "-1",
-        "SourceSecurityGroupId": {
-          "Ref": "{{ EnvironmentName }}SecurityGroup"
-        },
-        "SourceSecurityGroupOwnerId": "284816546669"
-      }
-    },
     "ingress2": {
       "Type": "AWS::EC2::SecurityGroupIngress",
       "Properties": {
         "GroupId": {
           "Ref": "{{ EnvironmentName }}SecurityGroup"
         },
-        "IpProtocol": "tcp",
-        "FromPort": "22",
-        "ToPort": "22",
-        "CidrIp": "0.0.0.0/0"
-      }
-    },
-    "ingress3": {
-      "Type": "AWS::EC2::SecurityGroupIngress",
-      "Properties": {
-        "GroupId": {
-          "Ref": "{{ EnvironmentName }}SecurityGroup"
-        },
-        "IpProtocol": "tcp",
-        "FromPort": "10000",
-        "ToPort": "19999",
+        "IpProtocol": "-1",
+        "FromPort": "0",
+        "ToPort": "65000",
         "CidrIp": "0.0.0.0/0"
       }
     },
@@ -323,5 +244,5 @@
       }
     }
   },
-  "Description": "{{ EnvironmentName }} Stack"
+  "Description": "{{ EnvironmentName }} stack"
 }
