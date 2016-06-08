@@ -1,11 +1,14 @@
 # note: this is python3!
 import boto3
+import botocore.exceptions
 import jinja2
 import json
 import os
 import os.path
 import subprocess
 import sys
+import threading
+import time
 
 #args should be a list
 def runListQuietly(args):
@@ -36,6 +39,8 @@ def runRemoteQuietly(sshKeyPath, user, host, *args):
     
 def renderTemplate(directory, templateFile, context):
     env = jinja2.Environment(loader=jinja2.FileSystemLoader(directory))
+    env.trim_blocks = True
+    env.lstrip_blocks = True
     outputFile = templateFile[:-4]
     template = env.get_template(templateFile)
     with open(os.path.join(directory,outputFile), 'w') as outf:
@@ -55,15 +60,150 @@ def renderTemplate(directory, templateFile, context):
 #     if p.returncode != 0:
 #         msg = '"' + cmd + '" failed with the following output: \n\t' + output[0]
 #         raise Exception(msg)    
+   
+def deployCFStack( cloudformation, stackName, stackDef, deployFailedEvent):
+    try:
+        cloudformation.create_stack(StackName = stackName, TemplateBody = stackDef)
+    except botocore.exceptions.ClientError as x:
+        print('cloudformation deploy failed with message: {0}'.format(x.response['Error']['Message']))
+        deployFailedEvent.set()
+   
+def printStackEvent(event):
+    print('{0} {1} {2} {3}'.format(event['Timestamp'],event['ResourceType'],event['LogicalResourceId'],event['ResourceStatus']))
+
+def monitorCFStack(boto3client, stackName, failedEvent, NotFoundOK = False):
+    lastSeenEventId = None
+    stackStatus = None #CREATE_IN_PROGRESS | CREATE_FAILED | CREATE COMPLETE
+    
+    time.sleep(5)
+    if failedEvent.is_set():
+        return False
+    
+    while True:
+        # loop over all events, possibly using multiple calls, don't
+        # don't print the ones that have already been seen
+        nextToken = None
+        eventList = [] #will be used to reverse the order of returned events
+        eventListFilled = False
+        try: 
+            describeEventsResponse = cf.describe_stack_events(StackName = context['EnvironmentName'])
+        except botocore.exceptions.ClientError as x:
+            if NotFoundOK and x.response['Error']['Message'].endswith('does not exist'):
+                print('stack does not exist - continuing')
+                return True
+            else:
+                sys.exit('boto3 describe_stack_events api failed with message: {0}'.format( x.response['Error']['Message']))
+            
+        if 'NextToken' in describeEventsResponse:
+            nextToken = describeEventsResponse['NextToken']
+        
+        for event in describeEventsResponse['StackEvents']:
+            if lastSeenEventId is not None and event['EventId'] == lastSeenEventId:
+                eventListFilled = True
+                break
+            
+            eventList.insert(0,event)
+                                                
+        while not eventListFilled and nextToken is not None:
+            try:
+                describeEventsResponse = cf.describe_stack_events(StackName = context['EnvironmentName'], NextToken = nextToken)
+            except botocore.exceptions.ClientError as x:
+                if NotFoundOK and x.response['Error']['Message'].endswith('does not exist'):
+                    print('stack does not exist - continuing')
+                    return True
+                else:
+                    sys.exit('boto3 describe_stack_events api failed with message: {0}'.format( x.response['Error']['Message']))
+
+            if 'NextToken' in describeEventsResponse:
+                nextToken = describeEventsResponse['NextToken']
+                            
+            for event in describeEventsResponse['StackEvents']:
+                if lastSeenEventId is not None and event['EventId'] == lastSeenEventId:
+                    eventListFilled = True
+                    break
+                
+                eventList.insert(0,event)
+
+        # now eventList has all unseen events in chrono order
+        # this can be empty of no new events have occurred since the last time they were checked
+        if len(eventList) > 0:
+            lastSeenEventId = eventList[-1]['EventId']
+            for event in eventList:
+                printStackEvent(event)
+                if event['ResourceType'] == 'AWS::CloudFormation::Stack':
+                    stackStatus = event['ResourceStatus']
+            
+        if stackStatus is not None and not stackStatus.endswith('_IN_PROGRESS'):
+            break
+        
+        if failedEvent.is_set():
+            return False
+        
+        time.sleep(5)
+    
+    if stackStatus.endswith('COMPLETE'):
+        return True
+    else:
+        return False
+    
     
 if __name__ == '__main__':
+    deleteStackArg = False
+    
+    if len(sys.argv) > 1:
+        if (sys.argv[1] == '--delete-existing-stack'):
+            deleteStackArg = True
+   
+    #read the environment file 
+    env = jinja2.Environment(loader=jinja2.FileSystemLoader('.'))
     with open('env.json', 'r') as contextFile:
         context = json.load(contextFile)
-        
+    
+    here = os.path.dirname(sys.argv[0])
+    if len(here) == 0:
+        here = '.'
+
+    # render the cloud formation template
+    renderTemplate(here,'cloudformation.json.tpl', context)
+    print('cloudformation.json rendered')
+    
+    
+    # set up boto2 clients for ec2 and cloudformation
     ec2 = boto3.client('ec2',
                        region_name=context['RegionName'],
                        aws_access_key_id = context['AWSAccessKeyId'],
                        aws_secret_access_key = context['AWSSecretAccessKey'])
+ 
+    
+    cf = boto3.client('cloudformation',
+                       region_name=context['RegionName'],
+                       aws_access_key_id = context['AWSAccessKeyId'],
+                       aws_secret_access_key = context['AWSSecretAccessKey'])
+
+    # delete the existing stack
+    if deleteStackArg:
+        print('deleting existing stack ... this could take a while')
+        try:
+            cf.delete_stack(StackName = context['EnvironmentName'])
+        except botocore.exceptions.ClientError as x:
+            sys.exit('Delete Stack failed with error message {0}'.format(x.response['Error']['Message']))
+            
+        if not monitorCFStack(cf,context['EnvironmentName'], threading.Event(), NotFoundOK = True):
+            sys.exit('Delete Stack Failed')
+        
+    #deploy the new stack
+    print('deploying cloudformation stack ... this could take a while')
+    
+    with open('cloudformation.json', 'r') as cfFile:
+        stackDef = cfFile.read()
+
+    deployFailedEvent = threading.Event()
+    deployThread = threading.Thread(target = deployCFStack, args=(cf,context['EnvironmentName'],stackDef, deployFailedEvent))
+    deployThread.start()
+    
+    stackStatus = monitorCFStack(cf, context['EnvironmentName'], deployFailedEvent)
+    if not stackStatus:
+        sys.exit('Exiting - Cloud Formation Stack Creation Failed')
 
     # only returns running instances - its important to wait for everything
     # to be running or it could be skipped
@@ -80,11 +220,24 @@ if __name__ == '__main__':
                 if tag['Key'] == 'Name':
                     ipTable[tag['Value']] = instance['PublicIpAddress']
                     break
-    serverNum = -1
+
+    #add the public ip address information to the context and render any
+    #remaining top level templates
     for server in context['Servers']:
-        serverNum += 1
         serverName = context['EnvironmentName'] + 'Server' + server['Name']
         ip = ipTable[serverName]
+        server['PublicIpAddress'] = ip
+        
+    for templateFile in os.listdir(here):
+        if templateFile.endswith('.tpl'):
+            if templateFile != 'cloudformation.json.tpl':
+                renderTemplate(here, templateFile, context)        
+                print('{0} rendered'.format(templateFile[0:-4]))
+                
+    serverNum = -1
+    for server in context['Servers']:
+        ip = server['PublicIpAddress']
+        serverNum += 1
         installationNum = -1
         for installation in server['Installations']:
             installationNum += 1
@@ -92,7 +245,6 @@ if __name__ == '__main__':
                 if templateFile.endswith('.tpl'):
                     context['ServerNum'] = serverNum
                     context['InstallationNum'] = installationNum
-                    context['Servers'][serverNum]['PublicIpAddress'] = ip
                     renderTemplate(installation['Name'], templateFile, context)
                     
             runQuietly('rsync', '-avz','--delete',

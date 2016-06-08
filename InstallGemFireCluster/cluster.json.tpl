@@ -2,8 +2,8 @@
     "global-properties":{
         "gemfire": "/runtime/gemfire",
         "java-home" : "/runtime/java",
-        "locators" : "10.0.0.{{ Servers[ServerNum].Installations[InstallationNum].LocatorServerNumber }}[10000]",
-        "cluster-home" : "/runtime/cluster"
+        "locators" : "10.0.0.101[10000]",
+        "cluster-home" : "/runtime/cluster1/var"
     },
    "locator-properties" : {
         "port" : 10000,
@@ -18,7 +18,7 @@
         "log-disk-space-limit" : "100",
         "archive-file-size-limit" : "10",
         "archive-disk-space-limit" : "100",
-        "jvm-options" : ["-Xmx{{ Servers[ServerNum].Installations[InstallationNum].Memory }}","-Xms{{ Servers[ServerNum].Installations[InstallationNum].Memory }}", "-XX:+UseConcMarkSweepGC", "-XX:+UseParNewGC"]
+        "jvm-options" : ["-Xmx8g","-Xms8g", "-XX:+UseConcMarkSweepGC", "-XX:+UseParNewGC"]
     },
    "datanode-properties" : {
         "server-port" : 10100,
@@ -30,37 +30,40 @@
         "log-disk-space-limit" : "100",
         "archive-file-size-limit" : "10",
         "archive-disk-space-limit" : "100",
-        "jvm-options" : ["-Xmx{{ Servers[ServerNum].Installations[InstallationNum].Memory }}","-Xms{{ Servers[ServerNum].Installations[InstallationNum].Memory }}","-Xmn1g", "-XX:+UseConcMarkSweepGC", "-XX:+UseParNewGC", "-XX:CMSInitiatingOccupancyFraction=75"]
+        "jvm-options" : ["-Xmx12g","-Xms12g","-Xmn2g", "-XX:+UseConcMarkSweepGC", "-XX:+UseParNewGC", "-XX:CMSInitiatingOccupancyFraction=75"]
     },
     "hosts": {
-    {% for Server in Servers %}
-    {% for Installation in Server.Installations %}
-    {% if Installation.Name == "InstallGemFire" %}
+    {% for Server in Servers  %}
         "ip-10-0-0-{{ Server.ServerNumber }}" : {
             "host-properties" :  {
              },
              "processes" : {
-                {% if Installation.Role == "locator" %}
+                {% if Server.ServerNumber == 101 %}
                 "locator" : {
                     "type" : "locator",
                     "bind-address": "10.0.0.{{ Server.ServerNumber }}",
                     "http-service-bind-address" : "10.0.0.{{ Server.ServerNumber }}",
                     "jmx-manager-bind-address" : "10.0.0.{{ Server.ServerNumber }}"
                  }
-                {% endif %}
-                {% if Installation.Role == "datanode" %}
-                "server" : {
+                {% else %}
+                "server{{ Server.ServerNumber }}" : {
                     "type" : "datanode",
                     "bind-address": "10.0.0.{{ Server.ServerNumber }}",
                     "server-bind-address" : "10.0.0.{{ Server.ServerNumber }}"
                  }
                 {% endif %}
+             },
+             "ssh" : {
+                "host" : "{{ Server.PublicIpAddress }}",
+                "user" : "root",
+                "key-file" : "{{ SSHKeyPath }}"
              }
+        {% if loop.last %}
+        }
+        {% else %}
         },
-    {% endif %}
+        {% endif %}
     {% endfor %}
-    {% endfor %}
-        "dummy": "this is just here to make the json correct"
    }
 }
 

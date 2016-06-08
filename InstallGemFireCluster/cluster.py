@@ -3,6 +3,7 @@
 from __future__ import print_function
 import clusterdef
 import json
+#import netifaces
 import os
 import os.path
 import re
@@ -51,7 +52,7 @@ def pidIsAlive(pidfile):
 def serverIsRunning(processName):
 	try:
 		port = clusterDef.locatorProperty(processName, 'server-port')
-		bindAddress = clusterDef.datanodeProperty(processName, 'server-bind-address')
+		bindAddress = clusterDef.translateBindAddress(clusterDef.datanodeProperty(processName, 'server-bind-address'))
 		
 		#leave the double parens in the line below!
 		sock = socket.create_connection((bindAddress, port))
@@ -69,7 +70,7 @@ def serverIsRunning(processName):
 	
 def locatorIsRunning(processName):
 	port = clusterDef.locatorProperty(processName, 'port')
-	bindAddress = clusterDef.locatorProperty(processName, 'bind-address')
+	bindAddress = clusterDef.translateBindAddress(clusterDef.locatorProperty(processName, 'bind-address'))
 	try:
 		#leave the double parens in the line below!
 		sock = socket.create_connection( (bindAddress, port))
@@ -164,6 +165,9 @@ def startLocator(processName):
 		,"--name={0}".format(processName)]
 	
 	#these are optional
+	if clusterDef.hasLocatorProperty(processName,'hostname-for-clients'):
+		cmdLine.append('--hostname-for-clients={0}'.format(clusterDef.locatorProperty(processName, 'hostname-for-clients')))
+	
 	if clusterDef.hasLocatorProperty(processName,'classpath'):
 		cmdLine.append('--classpath={0}'.format(clusterDef.locatorProperty(processName, 'classpath')))
 	
@@ -226,11 +230,13 @@ def launchServerProcess(processName):
 
 def startServer(processName):
 	proc = launchServerProcess(processName)
-	
-	if proc.wait() != 0:
-		sys.exit("cache server process failed to start - see the logs in {0}".format(datanodeDir(processName)))
 
-	
+	#could be none if the server was really already running	
+	if proc is not None:
+		if proc.wait() != 0:
+			sys.exit("cache server process failed to start - see the logs in {0}".format(datanodeDir(processName)))
+
+
 def startClusterLocal():
 	
 	# probably is only going to be one
@@ -239,7 +245,10 @@ def startClusterLocal():
 		
 	procList = []
 	for dnode in clusterDef.datanodesOnThisHost():
-		procList.append(launchServerProcess(dnode))
+		proc = launchServerProcess(dnode)
+		#can be None if server was already started
+		if proc is not None:
+			procList.append(proc)
 
 	failCount = 0
 	for proc in procList:
@@ -259,27 +268,53 @@ def stopClusterLocal():
 		stopLocator(locator)
 		
 			
-def stopCluster(cnum):
-	if not locatorIsRunning():
-		return
-		
-	rc = subprocess.call([GEMFIRE + "/bin/gfsh"
-		, "-e", "connect --locator=localhost[{0}]".format(locatorport(cnum))
-		,"-e", "shutdown"])
+def stopCluster():
+	GEMFIRE = None
+	JAVA = None
+	processList = clusterDef.locatorsOnThisHost()
+	if len(processList) > 0:
+		GEMFIRE = clusterDef.locatorProperty(processList[0],'gemfire')
+		JAVA_HOME = clusterDef.locatorProperty(processList[0],'java-home')
+	else:
+		processList = clusterDef.datanodesOnThisHost()
+		if len(processList) > 0:
+			GEMFIRE = clusterDef.locatorProperty(processList[0],'gemfire')
+			JAVA_HOME = clusterDef.locatorProperty(processList[0],'java-home')
+		else:
+			sys.exit('no cluster processes are on this host - unable to ascertain gfsh setup information')
+			
+	os.environ['GEMFIRE'] = GEMFIRE
+	os.environ['JAVA_HOME'] = JAVA_HOME
 
-	# it appears that the return code in this case is not correct
-	# will just hope for the best right now	
-	
-	stopLocator(cnum)
+	# pick any locator and connect to it
+	success = False
+	for hkey in clusterDef.clusterDef['hosts']:
+		host = clusterDef.clusterDef['hosts'][hkey]
+		for pkey in host['processes']:
+			process = host['processes'][pkey]
+			if process['type'] == 'locator':
+				if not success:
+					bindAddress = clusterDef.locatorProperty(pkey,'bind-address', host = hkey)
+					port = clusterDef.locatorProperty(pkey,'port', host = hkey)
+					GEMFIRE = clusterDef.locatorProperty(pkey,'gemfire', host = hkey)
+					rc = subprocess.call([GEMFIRE + "/bin/gfsh"
+						, "-e", "connect --locator={0}[{1}]".format(bindAddress,port)
+						,"-e", "shutdown"])
+					if rc == 0:
+						success = True
+			
+	if success == False:
+		sys.exit('could not shut down cluster')
+					
 	
 def printUsage():
 	print('Usage:')
-	print('   cluster.py <path-to-cluster-def> start <process-name>')
-	print('   cluster.py <path-to-cluster-def> stop <process-name>')
-	print('   cluster.py <path-to-cluster-def> status <process-name>')
+	print('   cluster.py  start <process-name>')
+	print('   cluster.py  stop <process-name>')
+	print('   cluster.py  status <process-name>')
 	print()
-	print('   cluster.py <path-to-cluster-def> start')
-	print('   cluster.py <path-to-cluster-def> stop')
+	print('   cluster.py  start')
+	print('   cluster.py  stop')
 	print('Notes:')
 	print('* all commands are idempotent')
 	
@@ -301,8 +336,9 @@ if __name__ == '__main__':
 	if len(sys.argv) == 1:
 		printUsage()
 		sys.exit(0)
-	
-	clusterDefFile = sys.argv[1]
+
+	here = os.path.dirname(sys.argv[0])
+	clusterDefFile = os.path.join(here, 'cluster.json')
 	if not os.path.isfile(clusterDefFile):
 		sys.exit('could not find cluster definition file: ' + clusterDefFile)
 		
@@ -323,20 +359,20 @@ if __name__ == '__main__':
 	
 	os.remove(tfileName)
 		
-	if len(sys.argv) < 3:
+	if len(sys.argv) < 2:
 		sys.exit('invalid input, please provide a command')
 		
-	cmd = sys.argv[2]
+	cmd = sys.argv[1]
 	
-	if len(sys.argv) == 3:
+	if len(sys.argv) == 2:
 		if cmd == 'start':
 			startClusterLocal()
 		elif cmd == 'stop':
-			stopClusterLocal()
+			stopCluster()
 		else:
 			sys.exit('unknown command: ' + cmd)
 	else:
-		obj = sys.argv[3]
+		obj = sys.argv[2]
 		
 		if clusterDef.isLocatorOnThisHost(obj):
 			if cmd == 'start':
