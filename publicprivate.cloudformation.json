@@ -1,0 +1,263 @@
+{ "AWSTemplateFormatVersion": "2010-09-09",
+  "Resources": {
+    "antifraudPlacementGroup": {
+      "Type" : "AWS::EC2::PlacementGroup",
+      "Properties" : {}
+    },
+    "antifraudVPC": {
+      "Type": "AWS::EC2::VPC",
+      "Properties": {
+        "CidrBlock": "10.0.0.0/24",
+        "InstanceTenancy": "default",
+        "EnableDnsSupport": "true",
+        "EnableDnsHostnames": "true",
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "antifraudVPC"
+          }
+        ]
+      }
+    },
+    "antifraudSubnetPublic": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "CidrBlock": "10.0.0.0/24",
+        "AvailabilityZone": "us-east-1a",
+        "VpcId": {
+          "Ref": "antifraudVPC"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "antifraudSubnetPublic"
+          }
+        ]
+      }
+    },
+    "antifraudInternetGateway": {
+      "Type": "AWS::EC2::InternetGateway",
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "antifraudInternetGateway"
+          }
+        ]
+      }
+    },
+    "antifraudInternetGatewayAttachment": {
+      "Type": "AWS::EC2::VPCGatewayAttachment",
+      "Properties": {
+        "VpcId": {
+          "Ref": "antifraudVPC"
+        },
+        "InternetGatewayId": {
+          "Ref": "antifraudInternetGateway"
+        }
+      }
+    },
+    "antifraudDHCPOptions": {
+      "Type": "AWS::EC2::DHCPOptions",
+      "Properties": {
+        "DomainName": "ec2.internal",
+        "DomainNameServers": [
+          "AmazonProvidedDNS"
+        ]
+      },
+      "Tags": [
+        {
+          "Key": "Name",
+          "Value": "antifraudInternetGateway"
+        }
+      ]
+  },
+    "antifraudDHCPOptionsAssoc": {
+    "Type": "AWS::EC2::VPCDHCPOptionsAssociation",
+    "Properties": {
+      "VpcId": {
+        "Ref": "antifraudVPC"
+      },
+      "DhcpOptionsId": {
+        "Ref": "antifraudDHCPOptions"
+      }
+    }
+  },
+    "antifraudRouteTableDefault": {
+      "Type": "AWS::EC2::RouteTable",
+      "Properties": {
+        "VpcId": {
+          "Ref": "antifraudVPC"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "antifraudRouteTableDefault"
+          }
+        ]
+      }
+    },
+    "antifraudRouteTablePublic": {
+      "Type": "AWS::EC2::RouteTable",
+      "Properties": {
+        "VpcId": {
+          "Ref": "antifraudVPC"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "antifraudRouteTablePublic"
+          }
+        ]
+      }
+    },
+    "antifraudRouteTablePublicSubnetAssoc": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "antifraudRouteTablePublic"
+        },
+        "SubnetId": {
+          "Ref": "antifraudSubnetPublic"
+        }
+      }
+    },
+    "antifraudRoute1": {
+      "Type": "AWS::EC2::Route",
+      "Properties": {
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "RouteTableId": {
+          "Ref": "antifraudRouteTablePublic"
+        },
+        "GatewayId": {
+          "Ref": "antifraudInternetGateway"
+        }
+      },
+      "DependsOn" : "antifraudRouteTablePublicSubnetAssoc"
+    },
+    "antifraudSecurityGroup": {
+      "Type" : "AWS::EC2::SecurityGroup",
+      "Properties" : {
+         "GroupDescription" : "antifraud Security Group",
+         "SecurityGroupIngress" : [
+            {
+               "CidrIp" : "0.0.0.0/0",
+               "IpProtocol" : "tcp",
+               "FromPort": 22,
+               "ToPort" : 22
+            },
+            {
+               "CidrIp" : "0.0.0.0/0",
+               "IpProtocol" : "tcp",
+               "FromPort": 80,
+               "ToPort" : 80
+            },
+            {
+               "CidrIp" : "0.0.0.0/0",
+               "IpProtocol" : "tcp",
+               "FromPort": 10000,
+               "ToPort" : 19999
+            }
+        ],
+         "Tags" :  [
+            {
+              "Key": "Name",
+              "Value": "antifraudSecurityGroup"
+            }
+         ],
+         "VpcId" : {"Ref": "antifraudVPC"}
+      }
+    },
+    "antifraudServerLocator": {
+      "Type": "AWS::EC2::Instance",
+      "Properties": {
+        "DisableApiTermination": "false",
+        "ImageId": "ami-78ac8110",
+        "InstanceType": "r3.large",
+        "KeyName": "antifraud-keypair",
+        "Monitoring": "false",
+        "PlacementGroupName": {
+          "Ref" : "antifraudPlacementGroup"
+        },
+        "NetworkInterfaces": [
+          {
+            "DeleteOnTermination": "true",
+            "DeviceIndex": 0,
+            "SubnetId": {
+              "Ref": "antifraudSubnetPublic"
+            },
+            "PrivateIpAddresses": [
+              {
+                "PrivateIpAddress": "10.0.0.101",
+                "Primary": "true"
+              }
+            ],
+            "AssociatePublicIpAddress": "true",
+            "GroupSet": [
+              {"Ref": "antifraudSecurityGroup"}
+            ]
+          }
+        ],
+      "BlockDeviceMappings" : [
+      ] ,
+      "Tags" : [
+        {
+          "Key" : "Name",
+          "Value" : "antifraudServerLocator"
+        },
+        {
+          "Key" : "Environment",
+          "Value" : "antifraud"
+        }
+      ]
+      },
+      "DependsOn" : "antifraudInternetGatewayAttachment"
+    }
+,    "antifraudServerCacheServer1": {
+      "Type": "AWS::EC2::Instance",
+      "Properties": {
+        "DisableApiTermination": "false",
+        "ImageId": "ami-78ac8110",
+        "InstanceType": "r3.large",
+        "KeyName": "antifraud-keypair",
+        "Monitoring": "false",
+        "PlacementGroupName": {
+          "Ref" : "antifraudPlacementGroup"
+        },
+        "NetworkInterfaces": [
+          {
+            "DeleteOnTermination": "true",
+            "DeviceIndex": 0,
+            "SubnetId": {
+              "Ref": "antifraudSubnetPublic"
+            },
+            "PrivateIpAddresses": [
+              {
+                "PrivateIpAddress": "10.0.0.111",
+                "Primary": "true"
+              }
+            ],
+            "AssociatePublicIpAddress": "true",
+            "GroupSet": [
+              {"Ref": "antifraudSecurityGroup"}
+            ]
+          }
+        ],
+      "BlockDeviceMappings" : [
+      ] ,
+      "Tags" : [
+        {
+          "Key" : "Name",
+          "Value" : "antifraudServerCacheServer1"
+        },
+        {
+          "Key" : "Environment",
+          "Value" : "antifraud"
+        }
+      ]
+      },
+      "DependsOn" : "antifraudInternetGatewayAttachment"
+    }
+  },
+  "Description": "antifraud environment"
+}
