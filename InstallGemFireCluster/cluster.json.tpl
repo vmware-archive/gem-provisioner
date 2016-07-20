@@ -33,7 +33,9 @@
         "jvm-options" : ["-Xmx12g","-Xms12g","-Xmn2g", "-XX:+UseConcMarkSweepGC", "-XX:+UseParNewGC", "-XX:CMSInitiatingOccupancyFraction=75"]
     },
     "hosts": {
+    {% set firstOne = true %}
     {% for Server in Servers  %}
+    {% for Installation in Server.Installations if Installation.Name == 'InstallGemFireCluster' %}
         "ip-10-0-0-{{ Server.ServerNumber }}" : {
             "host-properties" :  {
              },
@@ -58,12 +60,12 @@
                 "user" : "root",
                 "key-file" : "{{ SSHKeyPath }}"
              }
-        {% if loop.last %}
-        }
-        {% else %}
         },
-        {% endif %}
     {% endfor %}
+    {% endfor %}
+        "dummy" : {
+            "processes": []
+        }
    }
 }
 

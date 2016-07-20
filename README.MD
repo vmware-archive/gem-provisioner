@@ -1,33 +1,85 @@
-#Prerequesites#
-jina2
-boto3
-
-awscli should be configured with the access key id and secret access key
+###Prerequesites###
+* jina2
+* boto3
+* awscli should be configured with the access key id and secret access key
 and default region, or corresponding config files
 (~/.aws/config, ~/.aws/credentials) should be manually created
+* python3
 
-#Overview#
+###AWS Notes###
+* Creates a Cloud Formation template and deploys it programa
+* Launches ec2 instances in a VPC
+* Ingress allowed on all ports from within the VPC
+* Ingress on ports 22 and 10000-19999 from outside of VPC
+* Egress from VPC is unrestricted
+* All servers are configured with an ssh key for passwordless ssh
 
-Creates an AWS environment with the following characteristics.
+###Walk Through###
+As delivered, this project creates a GemFire cluster consisting of 1 locator
+and 2 cache servers, as well as 1 ETL server.  All servers are r3.large
+instances.
 
-One VPC with 2 subnets, one with IP addresses in the 10.0.0.* range and
-one with IP addresses in the 10.0.1.* range.
+__You may need to request an account limit increase to run this__.
 
-The 10.0.0.* range, hereafer called the "public subnet" routes to an internet
-gateway and has public ip addresses associated. It can connect to itself,
-the internet and the 10.0.1.* subnet and can receive connections from the
-internet on ports 22, 80 and 8000-8999.
+To run this you will need an AWS account, a set of user credentials and a 
+The key configuration file is "env.json".
 
-The 10.0.1.* range can receive connections from itself and the public subnet but
-not from the internet.  It can open connections to itself and the public subnet
-but has not route to internet addresses.
+You can either use the access_key_id and secret_access_key for the root account
+or you can create an IAM user and a secret access key for that user.  The IAM
+user will need to have the following policy attached.
 
-All machines have one network interface in the public subnet and one in the
-private subnet.  The public network interface is associated with one public
-IP address and one 10.0.0.* IP address.
+```json
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Action": [
+                "ec2:*",
+                "cloudformation:*",
+                "elasticloudbalancing:*"
+            ],
+            "Effect": "Allow",
+            "Resource": "*"
+        }
+    ]
+}```
 
-The pivate interface will be associated with an IP address in the 10.0.1.*
-subnet.  The 2 private IP addresses for one ec2 instance will have the same
-last octet.  For example, 10.0.0.101 and 10.0.1.101
+You will need a key pair, which can be created in the EC2 console.  You will
+need the corresponding ".pem" file on your local machine.
 
-All machines are launched in the same placement group.
+"env.json" is the primary configuration file.  Edit the following keys with
+appropriate values for your account.
+
+```
+    "EnvironmentName" : "antifraud",
+    "RegionName" : "us-east-1",
+    "AvailabilityZone" : "us-east-1a",
+    "KeyPair" : "antifraud-keypair",
+    "AWSAccessKeyId": "AKIATHISISBOGUSPS",
+    "AWSSecretAccessKey" : "WCc0mpl3tlyM4d3Up",
+    "SSHKeyPath" : "/users/rmay/Downloads/antifraud-keypair.pem",
+```
+
+Note that "EnvironmentName" can be anything. It is just a name which acts as
+a prefix for all of the cloud formation entities as well as the name of the
+stack that is created.
+
+Deploy the cluster:
+```
+python3 setup.py --delete-existing-stack
+```
+
+Start GemFire cluster
+
+```
+cd InstallGemFireCluster
+python gf.py start
+```
+
+To Tear It Down ....
+Use the Cloud Formation console to delete the stack.
+
+### Known Issues ###
+* Occasionally, after an the Amazon account has not had much deployment
+activity, deployment will fail because of a spurious "quota exceeded" error.
+This can usually be remedied by re-deploying.
