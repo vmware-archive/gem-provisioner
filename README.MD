@@ -7,7 +7,7 @@ and default region, or corresponding config files
 * python3
 
 ###AWS Notes###
-* Creates a Cloud Formation template and deploys it programa
+* Creates a Cloud Formation template and deploys it programmatically
 * Launches ec2 instances in a VPC
 * Ingress allowed on all ports from within the VPC
 * Ingress on ports 22 and 10000-19999 from outside of VPC
@@ -21,8 +21,8 @@ instances.
 
 __You may need to request an account limit increase to run this__.
 
-To run this you will need an AWS account, a set of user credentials and a 
-The key configuration file is "env.json".
+To run this you will need an AWS account, a set of user credentials and a key
+pair.
 
 You can either use the access_key_id and secret_access_key for the root account
 or you can create an IAM user and a secret access key for that user.  The IAM
@@ -42,7 +42,8 @@ user will need to have the following policy attached.
             "Resource": "*"
         }
     ]
-}```
+}
+```
 
 You will need a key pair, which can be created in the EC2 console.  You will
 need the corresponding ".pem" file on your local machine.
@@ -69,7 +70,7 @@ Deploy the cluster:
 python3 setup.py --delete-existing-stack
 ```
 
-Start GemFire cluster
+Start The GemFire cluster
 
 ```
 cd InstallGemFireCluster
