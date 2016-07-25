@@ -5,38 +5,10 @@ import jinja2
 import json
 import os
 import os.path
-import subprocess
 import sys
 import threading
 import time
 
-#args should be a list
-def runListQuietly(args):
-    p = subprocess.Popen(args, stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
-    output = p.communicate()
-    if p.returncode != 0:
-        raise Exception('"{0}" failed with the following output: {1}'.format(' '.join(list(args)), output[0]))
-    
-def runQuietly(*args):
-    runListQuietly(list(args))
-    
-def runRemote(sshKeyPath, user, host, *args):
-    prefix = ['ssh', '-o','StrictHostKeyChecking=no',
-                        '-t',
-                        '-i', sshKeyPath,
-                        '{0}@{1}'.format(user, host)]
-    
-    subprocess.check_call(prefix + list(args))
-    
-    
-def runRemoteQuietly(sshKeyPath, user, host, *args):
-    prefix = ['ssh', '-o','StrictHostKeyChecking=no',
-                        '-t',
-                        '-i', sshKeyPath,
-                        '{0}@{1}'.format(user, host)]
-    
-    runListQuietly( prefix + list(args))
-    
 def renderTemplate(directory, templateFile, context):
     env = jinja2.Environment(loader=jinja2.FileSystemLoader(directory))
     env.trim_blocks = True
@@ -46,21 +18,7 @@ def renderTemplate(directory, templateFile, context):
     with open(os.path.join(directory,outputFile), 'w') as outf:
         template.stream(context).dump(outf)
  
-    
-# def runRemoteQuietly(sshKeyPath, user, host, *args):
-#     newargs = ['ssh', '-o', 'StrictHostKeyChecking=no',
-#                '-t',
-#                '-i', sshKeyPath,
-#                user + '@' + host] + list(args)
-#     
-#     cmd = ' '.join(newargs)
-#     
-#     p = subprocess.Popen(newargs, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-#     output = p.communicate()
-#     if p.returncode != 0:
-#         msg = '"' + cmd + '" failed with the following output: \n\t' + output[0]
-#         raise Exception(msg)    
-   
+       
 def deployCFStack( cloudformation, stackName, stackDef, deployFailedEvent):
     try:
         cloudformation.create_stack(StackName = stackName, TemplateBody = stackDef)
