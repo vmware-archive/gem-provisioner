@@ -194,9 +194,9 @@ if __name__ == '__main__':
                 continue
             
             if status.endswith('IN_PROGRESS'):
-                sys.exit('%0 stack is currently being modified (%1)- please try later'.format(stackName, status))
+                sys.exit('{0} stack is currently being modified ({1})- please try later'.format(stackName, status))
 
-            print('%0 stack current status is %1'.format(stackName, status))
+            print('{0} stack current status is {1}'.format(stackName, status))
             stackSummary = stack
             break
         
