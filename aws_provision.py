@@ -114,6 +114,8 @@ def monitorCFStack(boto3client, stackName, failedEvent, NotFoundOK = False):
     
     
 if __name__ == '__main__':
+    assert sys.version_info >= (3,0)
+
     #read the environment file 
     env = jinja2.Environment(loader=jinja2.FileSystemLoader('.'))
     with open('env.json', 'r') as contextFile:

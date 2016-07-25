@@ -23,14 +23,21 @@ if __name__ == '__main__':
     runQuietly('aws', 'configure', 'set', 'aws_access_key_id', AWS_ACCESS_KEY_ID)
     runQuietly('aws', 'configure', 'set', 'aws_secret_access_key', AWS_SECRET_ACCESS_KEY)
     runQuietly('aws', 'configure', 'set', 'default.region', AWS_S3_BUCKET_REGION)
-    runQuietly('aws', 's3', 'cp', AWS_S3_BUCKET + JDK_FILE, '/tmp/setup')
-    runQuietly('tar', '-C', '/runtime', '-xzf', '/tmp/setup/' + JDK_FILE)
-    runQuietly('ln', '-s', '/runtime/' + JDK, '/runtime/java')
-    print '{0} - downloaded and installed java'.format(ip)
     
-    runQuietly('aws', 's3', 'cp', AWS_S3_BUCKET + GEMFIRE_FILE, '/tmp/setup')
-    runQuietly('tar', '-C', '/runtime', '-xzf', '/tmp/setup/' + GEMFIRE_FILE)
-    GEMFIRE = GEMFIRE_FILE[0:GEMFIRE_FILE.find('.tar.gz')]
-    runQuietly('ln', '-s', '/runtime/Pivotal_GemFire_820_b17919_Linux', '/runtime/gemfire')
-    print '{0} - downloaded and installed GemFire'.format(ip)
+    if os.path.exists('/runtime/java'):
+        print 'java is already installed - continuing'
+    else:
+        runQuietly('aws', 's3', 'cp', AWS_S3_BUCKET + JDK_FILE, '/tmp/setup')
+        runQuietly('tar', '-C', '/runtime', '-xzf', '/tmp/setup/' + JDK_FILE)
+        runQuietly('ln', '-s', '/runtime/' + JDK, '/runtime/java')
+        print '{0} - downloaded and installed java'.format(ip)
+
+    if os.path.exists('/runtime/gemfire'):
+        print 'gemfire is already installed - continuing'
+    else:
+        runQuietly('aws', 's3', 'cp', AWS_S3_BUCKET + GEMFIRE_FILE, '/tmp/setup')
+        runQuietly('tar', '-C', '/runtime', '-xzf', '/tmp/setup/' + GEMFIRE_FILE)
+        GEMFIRE = GEMFIRE_FILE[0:GEMFIRE_FILE.find('.tar.gz')]
+        runQuietly('ln', '-s', '/runtime/Pivotal_GemFire_820_b17919_Linux', '/runtime/gemfire')
+        print '{0} - downloaded and installed GemFire'.format(ip)
     

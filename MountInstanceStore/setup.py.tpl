@@ -15,7 +15,12 @@ if __name__ == '__main__':
     device = '{{ Servers[ServerNum].Installations[InstallationNum].Device }}'
     fsType = '{{ Servers[ServerNum].Installations[InstallationNum].FileSystemType }}'
     ip = '{{ Servers[ServerNum].PublicIpAddress }}'
-    runQuietly('mkfs', '-t', fsType, device)
-    runQuietly('mkdir', mountPoint)
-    runQuietly('mount', '-t',fsType, device,mountPoint)
-    print '{0} - instance store initialized and mounted on {1}'.format(ip, mountPoint)
+    
+    if os.path.exists(mountPoint):
+        print 'instance store mount point already exists - continuing'
+    
+    else:
+        runQuietly('mkfs', '-t', fsType, device)
+        runQuietly('mkdir', mountPoint)
+        runQuietly('mount', '-t',fsType, device,mountPoint)
+        print '{0} - instance store initialized and mounted on {1}'.format(ip, mountPoint)
