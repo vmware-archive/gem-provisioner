@@ -3,7 +3,7 @@
         "gemfire": "/runtime/gemfire",
         "java-home" : "/runtime/java",
         "locators" : "10.0.0.101[10000]",
-        "cluster-home" : "/runtime/cluster1/var"
+        "cluster-home" : "/runtime/gem_cluster_1"
     },
    "locator-properties" : {
         "port" : 10000,
@@ -45,13 +45,15 @@
                     "type" : "locator",
                     "bind-address": "10.0.0.{{ Server.ServerNumber }}",
                     "http-service-bind-address" : "10.0.0.{{ Server.ServerNumber }}",
-                    "jmx-manager-bind-address" : "10.0.0.{{ Server.ServerNumber }}"
+                    "jmx-manager-bind-address" : "10.0.0.{{ Server.ServerNumber }}",
+                    "jmx-manager-hostname-for-clients" : "{{ Server.PublicIpAddress }}"
                  }
                 {% else %}
                 "server{{ Server.ServerNumber }}" : {
                     "type" : "datanode",
                     "bind-address": "10.0.0.{{ Server.ServerNumber }}",
-                    "server-bind-address" : "10.0.0.{{ Server.ServerNumber }}"
+                    "server-bind-address" : "10.0.0.{{ Server.ServerNumber }}",
+                    "hostname-for-clients" : "{{ Server.PublicIpAddress }}"
                  }
                 {% endif %}
              },
