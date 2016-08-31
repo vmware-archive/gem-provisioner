@@ -1,3 +1,6 @@
+#
+# Copyright (c) 2015-2016 Pivotal Software, Inc. All Rights Reserved.
+#
 import json
 import os.path
 import subprocess

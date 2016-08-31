@@ -1,3 +1,6 @@
+#
+# Copyright (c) 2015-2016 Pivotal Software, Inc. All Rights Reserved.
+#
 # note: this is python3!
 import boto3
 import botocore.exceptions
