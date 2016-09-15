@@ -76,13 +76,7 @@ if __name__ == '__main__':
 
     with open('runtime.json','r') as f:
         ipTable = json.load(f)
-                
-    for templateFile in os.listdir(here):
-        if templateFile.endswith('.tpl'):
-            if templateFile != 'cloudformation.json.tpl':
-                renderTemplate(here, templateFile, context)        
-                print('{0} rendered'.format(templateFile[0:-4]))
-                
+                                        
     serverNum = -1
     for server in context['Servers']:
         serverName = context['EnvironmentName'] + 'Server' + server['Name']
@@ -100,11 +94,11 @@ if __name__ == '__main__':
                     
             runQuietly('rsync', '-avz','--delete',
                 '-e' ,'ssh -o StrictHostKeyChecking=no -i {0}'.format(context['SSHKeyPath']),
-                installation['Name'] + '/', 'root@' + ip + ':/tmp/setup')
+                installation['Name'] + '/', server['SSHUser'] + '@' + ip + ':/tmp/setup')
             
-            runRemote(context['SSHKeyPath'], 'root', ip,
-                      'python','/tmp/setup/setup.py')
+            runRemote(context['SSHKeyPath'], server['SSHUser'], ip,
+                      'sudo', 'python','/tmp/setup/setup.py')
             
-            runRemoteQuietly(context['SSHKeyPath'], 'root', ip,
+            runRemoteQuietly(context['SSHKeyPath'], server['SSHUser'], ip,
                       'rm','-rf', '/tmp/setup')
             

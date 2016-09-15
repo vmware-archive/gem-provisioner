@@ -1,344 +1,160 @@
 {
   "AWSTemplateFormatVersion": "2010-09-09",
   "Resources": {
-    "{{ EnvironmentName }}PlacementGroup": {
-      "Type" : "AWS::EC2::PlacementGroup",
+    {######### VPC Definitions #############}
+    "VPC" : {
+       "Type" : "AWS::EC2::VPC",
+       "Properties" : {
+          "CidrBlock" : "192.168.1.0/24",
+          "Tags" : [
+            {
+              "Key": "Name",
+              "Value": "{{ EnvironmentName }}VPC"
+            }
+          ]
+       }
+    },
+    "PublicSubnet" : {
+      "Type" : "AWS::EC2::Subnet",
       "Properties" : {
-        "Tags": [
-          {
-            "Key": "Name",
-            "Value": "{{ EnvironmentName }}PlacementGroup"
-          },
-          {
-            "Key": "Environment",
-            "Value": "{{ EnvironmentName }}"
-          }
-        ]
+         "AvailabilityZone" : "{{ AvailabilityZone }}",
+         "CidrBlock" : { "Fn::GetAtt" : ["VPC","CidrBlock"]},
+         "MapPublicIpOnLaunch" : true,
+          "Tags" : [
+            {
+              "Key": "Name",
+              "Value": "{{ EnvironmentName }}PublicSubnet"
+            }
+          ],
+         "VpcId" : { "Ref" : "VPC" }
       }
     },
-    "{{ EnvironmentName }}VPC": {
-      "Type": "AWS::EC2::VPC",
-      "Properties": {
-        "CidrBlock": "10.0.0.0/16",
-        "InstanceTenancy": "default",
-        "EnableDnsSupport": "true",
-        "EnableDnsHostnames": "true",
-        "Tags": [
-          {
-            "Key": "Name",
-            "Value": "{{ EnvironmentName }}VPC"
-          },
-          {
-            "Key": "Environment",
-            "Value": "{{ EnvironmentName }}"
-          }
-        ]
-      }
-    },
-    "{{ EnvironmentName }}SubnetPublic": {
-      "Type": "AWS::EC2::Subnet",
-      "Properties": {
-        "CidrBlock": "10.0.0.0/24",
-        "AvailabilityZone": "us-east-1b",
-        "VpcId": {
-          "Ref": "{{ EnvironmentName }}VPC"
-        },
-        "Tags": [
-          {
-            "Key": "Name",
-            "Value": "{{ EnvironmentName }}SubnetPublic"
-          },
-          {
-            "Key": "Environment",
-            "Value": "{{ EnvironmentName }}"
-          }
-        ]
-      }
-    },
-    "{{ EnvironmentName }}InternetGateway": {
-      "Type": "AWS::EC2::InternetGateway",
-      "Properties": {
-        "Tags": [
+    "InternetGateway":{
+      "Type" : "AWS::EC2::InternetGateway",
+      "Properties" : {
+        "Tags" : [
           {
             "Key": "Name",
             "Value": "{{ EnvironmentName }}InternetGateway"
-          },
-          {
-            "Key": "Environment",
-            "Value": "{{ EnvironmentName }}"
           }
         ]
       }
     },
-    "{{ EnvironmentName }}DHCPOptions": {
-      "Type": "AWS::EC2::DHCPOptions",
-      "Properties": {
-        "DomainName": "ec2.internal",
-        "DomainNameServers": [
-          "AmazonProvidedDNS"
-        ],
-        "Tags": [
+    "RouteTable" : {
+      "Type" : "AWS::EC2::RouteTable",
+      "Properties" : {
+        "VpcId" : {"Ref": "VPC"},
+        "Tags" : [
           {
             "Key": "Name",
-            "Value": "{{ EnvironmentName }}DHCPOptions"
-          },
-          {
-            "Key": "Environment",
-            "Value": "{{ EnvironmentName }}"
+            "Value" : "{{ EnvironmentName }}RouteTable"
           }
         ]
       }
     },
-    "{{ EnvironmentName }}NetworkAcl": {
-      "Type": "AWS::EC2::NetworkAcl",
-      "Properties": {
-        "VpcId": {
-          "Ref": "{{ EnvironmentName }}VPC"
-        },
-        "Tags": [
-          {
-            "Key": "Name",
-            "Value": "{{ EnvironmentName }}NetworkAcl"
-          },
-          {
-            "Key": "Environment",
-            "Value": "{{ EnvironmentName }}"
-          }
-        ]
-      }
-    },
-    "{{ EnvironmentName }}RouteTable1": {
-      "Type": "AWS::EC2::RouteTable",
-      "Properties": {
-        "VpcId": {
-          "Ref": "{{ EnvironmentName }}VPC"
-        },
-        "Tags": [
-          {
-            "Key": "Name",
-            "Value": "{{ EnvironmentName }}RouteTable1"
-          },
-          {
-            "Key": "Environment",
-            "Value": "{{ EnvironmentName }}"
-          }
-        ]
-      }
-    },
-    "{{ EnvironmentName }}RouteTable2": {
-      "Type": "AWS::EC2::RouteTable",
-      "Properties": {
-        "VpcId": {
-          "Ref": "{{ EnvironmentName }}VPC"
-        },
-        "Tags": [
-          {
-            "Key": "Name",
-            "Value": "{{ EnvironmentName }}RouteTable2"
-          },
-          {
-            "Key": "Environment",
-            "Value": "{{ EnvironmentName }}"
-          }
-        ]
-      }
-    },
-    {% for Server in Servers %}
-    {% if not loop.first %}, {% endif %}
-    "{{ EnvironmentName }}{{ Server.Name }}": {
-      "Type": "AWS::EC2::Instance",
-      "Properties": {
-        "DisableApiTermination": "false",
-        "InstanceInitiatedShutdownBehavior": "terminate",
-        "ImageId": "{{ Server.ImageId }}",
-        "InstanceType": "{{ Server.InstanceType }}",
-        "KeyName": "{{ KeyPair }}",
-        "Monitoring": "false",
-        "PlacementGroupName": {
-          "Ref" : "{{ EnvironmentName }}PlacementGroup"
-        },
-        "NetworkInterfaces": [
-          {
-            "DeleteOnTermination": "true",
-            "Description": "Primary network interface",
-            "DeviceIndex": 0,
-            "SubnetId": {
-              "Ref": "{{ EnvironmentName }}SubnetPublic"
-            },
-            "PrivateIpAddresses": [
-              {
-                "PrivateIpAddress": "10.0.0.{{ Server.ServerNumber }}",
-                "Primary": "true"
-              }
-            ],
-            "GroupSet": [
-              {
-                "Ref": "{{ EnvironmentName }}SecurityGroup"
-              }
-            ],
-            "AssociatePublicIpAddress": "true"
-          }
-        ],
-        "Tags": [
-          {
-            "Key": "Name",
-            "Value": "{{ EnvironmentName }}Server{{ Server.Name }}"
-          },
-          {
-            "Key": "Environment",
-            "Value": "{{ EnvironmentName }}"
-          }
-        ]
-      }
-    }
-    {% endfor %},
-    "{{ EnvironmentName }}SecurityGroup": {
-      "Type": "AWS::EC2::SecurityGroup",
-      "Properties": {
-        "GroupDescription": "{{ EnvironmentName }} Security Group",
-        "VpcId": {
-          "Ref": "{{ EnvironmentName }}VPC"
-        },
-        "Tags": [
-          {
-            "Key": "Name",
-            "Value": "{{ EnvironmentName }}SecurityGroup"
-          },
-          {
-            "Key": "Environment",
-            "Value": "{{ EnvironmentName }}"
-          }
-        ]
-      }
-    },
-    "acl3": {
-      "Type": "AWS::EC2::NetworkAclEntry",
-      "Properties": {
-        "CidrBlock": "0.0.0.0/0",
-        "Egress": "true",
-        "Protocol": "-1",
-        "RuleAction": "allow",
-        "RuleNumber": "100",
-        "NetworkAclId": {
-          "Ref": "{{ EnvironmentName }}NetworkAcl"
-        }
-      }
-    },
-    "acl4": {
-      "Type": "AWS::EC2::NetworkAclEntry",
-      "Properties": {
-        "CidrBlock": "0.0.0.0/0",
-        "Protocol": "-1",
-        "RuleAction": "allow",
-        "RuleNumber": "100",
-        "NetworkAclId": {
-          "Ref": "{{ EnvironmentName }}NetworkAcl"
-        }
-      }
-    },
-    "subnetacl2": {
-      "Type": "AWS::EC2::SubnetNetworkAclAssociation",
-      "Properties": {
-        "NetworkAclId": {
-          "Ref": "{{ EnvironmentName }}NetworkAcl"
-        },
-        "SubnetId": {
-          "Ref": "{{ EnvironmentName }}SubnetPublic"
-        }
-      }
-    },
-    "gw2": {
-      "Type": "AWS::EC2::VPCGatewayAttachment",
-      "Properties": {
-        "VpcId": {
-          "Ref": "{{ EnvironmentName }}VPC"
-        },
-        "InternetGatewayId": {
-          "Ref": "{{ EnvironmentName }}InternetGateway"
-        }
-      }
-    },
-    "subnetroute4": {
-      "Type": "AWS::EC2::SubnetRouteTableAssociation",
-      "Properties": {
-        "RouteTableId": {
-          "Ref": "{{ EnvironmentName }}RouteTable2"
-        },
-        "SubnetId": {
-          "Ref": "{{ EnvironmentName }}SubnetPublic"
-        }
-      }
-    },
-    "route2": {
-      "Type": "AWS::EC2::Route",
-      "Properties": {
-        "DestinationCidrBlock": "0.0.0.0/0",
-        "RouteTableId": {
-          "Ref": "{{ EnvironmentName }}RouteTable2"
-        },
-        "GatewayId": {
-          "Ref": "{{ EnvironmentName }}InternetGateway"
-        }
+    "RouteToInternet" : {
+      "Type" : "AWS::EC2::Route",
+      "Properties" : {
+        "DestinationCidrBlock" : "0.0.0.0/0",
+        "GatewayId" : {"Ref": "InternetGateway"},
+        "RouteTableId" : {"Ref":  "RouteTable"}
       },
-      "DependsOn": "gw2"
+      "DependsOn": ["VPCGatewayAttachment"]
     },
-    "dchpassoc2": {
-      "Type": "AWS::EC2::VPCDHCPOptionsAssociation",
-      "Properties": {
-        "VpcId": {
-          "Ref": "{{ EnvironmentName }}VPC"
-        },
-        "DhcpOptionsId": {
-          "Ref": "{{ EnvironmentName }}DHCPOptions"
-        }
+    "PublicSubnetRouteTableAssociation" : {
+      "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties" : {
+         "RouteTableId" : {"Ref" : "RouteTable"},
+         "SubnetId" : {"Ref" : "PublicSubnet"}
       }
     },
-    "ingress1": {
-      "Type": "AWS::EC2::SecurityGroupIngress",
-      "Properties": {
-        "GroupId": {
-          "Ref": "{{ EnvironmentName }}SecurityGroup"
-        },
-        "IpProtocol": "-1",
-        "SourceSecurityGroupId": {
-          "Ref": "{{ EnvironmentName }}SecurityGroup"
-        }
+    "VPCGatewayAttachment":{
+      "Type" : "AWS::EC2::VPCGatewayAttachment",
+      "Properties" : {
+         "InternetGatewayId" : {"Ref" : "InternetGateway"  },
+         "VpcId" : {"Ref" : "VPC"}
       }
     },
-    "ingress2": {
-      "Type": "AWS::EC2::SecurityGroupIngress",
-      "Properties": {
-        "GroupId": {
-          "Ref": "{{ EnvironmentName }}SecurityGroup"
-        },
-        "IpProtocol": "tcp",
-        "FromPort": "22",
-        "ToPort": "22",
-        "CidrIp": "0.0.0.0/0"
+    "SecurityGroup":{
+      "Type" : "AWS::EC2::SecurityGroup",
+      "Properties" : {
+         "GroupDescription" : "{{ EnvironmentName }}SecurityGroup",
+         "VpcId" : {"Ref" : "VPC"},
+         {#####  When No Egress Rules are Specified Default Allows All #####}
+         "SecurityGroupIngress" : [
+            {
+              "IpProtocol" : "-1",
+               "CidrIp" : { "Fn::GetAtt": ["VPC","CidrBlock"]}
+            },
+            {
+              "IpProtocol" : "tcp",
+               "FromPort" : "22",
+               "ToPort" : "22",
+               "CidrIp" : "0.0.0.0/0"
+            },
+            {
+              "IpProtocol" : "tcp",
+               "FromPort" : "10000",
+               "ToPort" : "19999",
+               "CidrIp" : "0.0.0.0/0"
+            }
+          ],
+          "Tags" : [
+            {
+              "Key": "Name",
+              "Value" : "{{ EnvironmentName }}SecurityGroup"
+            }
+          ]
       }
+    
     },
-    "ingress3": {
-      "Type": "AWS::EC2::SecurityGroupIngress",
-      "Properties": {
-        "GroupId": {
-          "Ref": "{{ EnvironmentName }}SecurityGroup"
-        },
-        "IpProtocol": "tcp",
-        "FromPort": "10000",
-        "ToPort": "19999",
-        "CidrIp": "0.0.0.0/0"
-      }
-    },
-    "egress1": {
-      "Type": "AWS::EC2::SecurityGroupEgress",
-      "Properties": {
-        "GroupId": {
-          "Ref": "{{ EnvironmentName }}SecurityGroup"
-        },
-        "IpProtocol": "-1",
-        "CidrIp": "0.0.0.0/0"
+    {######### Server Definitions ###########}
+    {% for Server in Servers %}
+    "{{ Server.Name }}" : {
+      "Type" : "AWS::EC2::Instance",
+      "Properties" : {
+         "AvailabilityZone" : "{{ AvailabilityZone }}",
+         "EbsOptimized" : true,
+         "ImageId" : "{{ Server.ImageId }}",
+         "InstanceInitiatedShutdownBehavior" : "stop",
+         "InstanceType" : "{{ Server.InstanceType }}",
+         "KeyName" : "{{ KeyPair }}",
+         "PrivateIpAddress" : "192.168.1.{{ Server.ServerNumber }}",
+         "SecurityGroupIds" : [ { "Ref" : "SecurityGroup"}],
+         "SubnetId" : { "Ref" : "PublicSubnet"},
+         "Tags" : [
+            {
+              "Key": "Name",
+              "Value" : "{{ EnvironmentName }}Server{{ Server.Name }}"
+            },
+            {
+              "Key": "Environment",
+              "Value" : "{{ EnvironmentName }}"
+            }
+          ],
+          {#### ESB Volumes Are Attached Here ####}
+         "Volumes" : [
+         {% for Device in Server.BlockDevices if Device.DeviceType == 'EBS' %}
+          {
+            "Device" : "{{ Device.Device }}",
+            "VolumeId" : "{{ Device.EBSVolumeId }}"
+          }
+        {% if not loop.last %},{% endif %}
+        {% endfor %}
+         ] ,
+         {#### Ephemeral Volumes are Mapped Here ####}
+         "BlockDeviceMappings" : [
+         {% for Device in Server.BlockDevices if Device.DeviceType == 'Ephemeral' %}
+            {
+              "DeviceName" : "{{ Device.Device }}",
+              "VirtualName" : "ephemeral{{ loop.index0 }}"
+            } {% if not loop.last %},{% endif %}
+          {% endfor %}
+         ]
       }
     }
+    {% if not loop.last %}, {% endif %}
+    {% endfor %}
   },
-  "Description": "{{ EnvironmentName }} stack"
+  "Description": "{{ EnvironmentName }} Stack"
 }

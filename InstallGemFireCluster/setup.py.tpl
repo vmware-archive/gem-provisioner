@@ -2,7 +2,9 @@
 # Copyright (c) 2015-2016 Pivotal Software, Inc. All Rights Reserved.
 #
 import json
+import os
 import os.path
+import pwd
 import shutil
 import subprocess
 
@@ -55,7 +57,7 @@ if __name__ == '__main__':
             runQuietly('unzip', '/tmp/setup/' + clusterScriptsArchive, '-d', clusterParent)     
             moveFrom = os.path.join(clusterParent,clusterScriptsArchive)[:-1 * len('.zip')]
         
-        runQuietly('mv', moveFrom, clusterHome)
+        runQuietly('mv', moveFrom, clusterHome)        
         print '{0} gemfire cluster control scripts installed in {1}'.format(ip, clusterHome)
         
         
@@ -66,10 +68,11 @@ if __name__ == '__main__':
         if gemtoolsArchive.endswith('.tar.gz'):
             runQuietly('tar', '-C', clusterHome, '-xzf', '/tmp/setup/' + gemtoolsArchive)
         elif gemtoolsArchive.endswith('.zip'):
-            runQuietly('unzip', '/tmp/setup/' + gemtoolsArchive, '-d', clusterHome)     
-        
+            runQuietly('unzip', '/tmp/setup/' + gemtoolsArchive, '-d', clusterHome)
+            
         print '{0} gemfire toolkit installed in {1}'.format(ip, os.path.join(clusterHome,'gemtools'))
         
     runQuietly('cp','/tmp/setup/cluster.json',clusterHome)
+    runQuietly('chown', '-R', '{0}:{0}'.format('{{ Servers[ServerNum].SSHUser }}'), clusterHome)
     print '{0} copied cluster definition into {1}'.format(ip, clusterHome)
     

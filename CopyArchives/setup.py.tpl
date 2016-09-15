@@ -1,7 +1,9 @@
 #
 # Copyright (c) 2015-2016 Pivotal Software, Inc. All Rights Reserved.
 #
+import os
 import os.path
+import pwd
 import shutil
 import subprocess
 
@@ -49,7 +51,9 @@ if __name__ == '__main__':
         if archiveFile.endswith('.tar.gz'):
             runQuietly('tar', '-C', parentDir, '-xzf', '/tmp/setup/' + archiveFile)
         elif archiveFile.endswith('.zip'):
-            runQuietly('unzip', '/tmp/setup/' + archiveFile, '-d', parentDir)     
+            runQuietly('unzip', '/tmp/setup/' + archiveFile, '-d', parentDir)
+            
+        runQuietly('chown', '-R', '{0}:{0}'.format('{{ Servers[ServerNum].SSHUser }}'), os.path.join(parentDir,archiveDir))
         
         {% if 'LinkName' in Archive %}
         linkName = '{{ Archive.LinkName }}'

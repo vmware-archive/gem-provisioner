@@ -55,7 +55,7 @@ def monitorCFStack(boto3client, stackName, failedEvent, NotFoundOK = False):
         eventList = [] #will be used to reverse the order of returned events
         eventListFilled = False
         try: 
-            describeEventsResponse = cf.describe_stack_events(StackName = context['EnvironmentName'])
+            describeEventsResponse = cf.describe_stack_events(StackName = stackName)
         except botocore.exceptions.ClientError as x:
             if NotFoundOK and x.response['Error']['Message'].endswith('does not exist'):
                 print('stack does not exist - continuing')
@@ -75,7 +75,7 @@ def monitorCFStack(boto3client, stackName, failedEvent, NotFoundOK = False):
                                                 
         while not eventListFilled and nextToken is not None:
             try:
-                describeEventsResponse = cf.describe_stack_events(StackName = context['EnvironmentName'], NextToken = nextToken)
+                describeEventsResponse = cf.describe_stack_events(StackName = stackName, NextToken = nextToken)
             except botocore.exceptions.ClientError as x:
                 if NotFoundOK and x.response['Error']['Message'].endswith('does not exist'):
                     print('stack does not exist - continuing')
@@ -123,22 +123,14 @@ if __name__ == '__main__':
     env = jinja2.Environment(loader=jinja2.FileSystemLoader('.'))
     with open('env.json', 'r') as contextFile:
         context = json.load(contextFile)
-
-    with open('storage.json','r') as f:
-        storageTable = json.load(f)
-
-    for server in context['Servers']:        
-        for blockDevice in server['BlockDevices']:
-            if blockDevice['DeviceType'] == 'EBS':
-                blockDevice['EBSVolumeId'] = storageTable[server['Name']][blockDevice['Device']]
-        
+    
     here = os.path.dirname(sys.argv[0])
     if len(here) == 0:
         here = '.'
 
     # render the cloud formation template
-    renderTemplate(here,'cloudformation.json.tpl', context)
-    print('cloudformation.json rendered')
+    renderTemplate(here,'storage.json.tpl', context)
+    print('storage.json rendered')
     
     
     # set up boto2 clients for ec2 and cloudformation
@@ -157,7 +149,7 @@ if __name__ == '__main__':
     # TODO - currently not handling paginated results from this API!
     
     stackSummary = None
-    stackName = context['EnvironmentName']
+    stackName = context['EnvironmentName'] + "Storage"
     for stack in stacks['StackSummaries']:
         if stack['StackName'] == stackName:
             status = stack['StackStatus']
@@ -171,7 +163,7 @@ if __name__ == '__main__':
             stackSummary = stack
             break
         
-    with open('cloudformation.json', 'r') as cfFile:
+    with open('storage.json', 'r') as cfFile:
         stackDef = cfFile.read()
 
     #deploy the new stack or update the existing one
@@ -184,33 +176,41 @@ if __name__ == '__main__':
         tgt = updateCFStack        
         
     deployFailedEvent = threading.Event()
-    deployThread = threading.Thread(target = tgt, args=(cf,context['EnvironmentName'],stackDef, deployFailedEvent))
+    deployThread = threading.Thread(target = tgt, args=(cf,stackName,stackDef, deployFailedEvent))
     deployThread.start()
     
-    stackStatus = monitorCFStack(cf, context['EnvironmentName'], deployFailedEvent)
+    stackStatus = monitorCFStack(cf, stackName, deployFailedEvent)
     if not stackStatus:
         sys.exit('Exiting - Cloud Formation Stack Create or Update Failed')
     else:
         print('stack provisioned successfully')
             
-    # only returns running instances - its important to wait for everything
-    # to be running or it could be skipped
-    result = ec2.describe_instances( Filters=[
-        { 'Name':'tag:Environment', 'Values': [context['EnvironmentName']]},
-        { 'Name':'instance-state-name', 'Values': ['running']}
-        ])
+    result = ec2.describe_volumes( Filters=[
+        { 'Name':'tag:Environment', 'Values': [context['EnvironmentName']]}
+    ])
     
-    # create a lookup table for public ip addresses
-    ipTable = dict()
-    for reservation in result['Reservations']:
-        for instance in reservation['Instances']:
-            for tag in instance['Tags']:
-                if tag['Key'] == 'Name':
-                    ipTable[tag['Value']] = instance['PublicIpAddress']
-                    break
-
-    with open('runtime.json', 'w') as runtimeFile:
-        json.dump(ipTable, runtimeFile, indent = 3)
+    volTable = dict()
+    for vol in result['Volumes']:
+        for tag in vol['Tags']:
+            if tag['Key'] == 'ServerName':
+                serverName = tag['Value']
+            elif tag['Key'] == 'Device':
+                device = tag['Value']
+                
+        if serverName is None or device is None:
+            continue #CONTINUE
         
-    print('runtime information written to "runtime.json"')
+        if serverName in volTable:
+            devTable = volTable[serverName]
+        else:
+            devTable = dict()
+            volTable[serverName] = devTable
+            
+        devTable[device] = vol['VolumeId']
+    
+    with open('storage.json', 'w') as f:
+        json.dump(volTable, f, indent = 3)
+        
+    print('EBS volume information written to "storage.json"')
+
     
