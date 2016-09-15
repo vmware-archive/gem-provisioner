@@ -1,7 +1,8 @@
 ### Overview ###
 This project has 2 functions.
-* _aws_provision.py_ : Provision and configure AWS resources for a GemFire cluster.  This includes
-ec2 instances, a VPC, Security Groups and multiple other resources.
+* _aws\_provision\_storage.py_ and _aws\_provision.py_ : Provision and configure
+AWS resources for a GemFire cluster.  This includes EBS Volumes, ec2 instances,
+a VPC, Security Groups and multiple other resources.
 * _setup.py_ : Install a GemFire cluster onto a set of hosts in a way that allows the
 cluster to be managed using the _gemfire-manager_ project: https://github.com/Pivotal-Data-Engineering/gemfire-manager.
 
@@ -12,7 +13,9 @@ other platforms.
 
 Both functions drive off of a single configuration file: _env.json_
 The _env.json_ included with the project provisions 1 locator, 3 cache servers
-and 1 ETL server, all on r3.large instances. 
+and 1 ETL server.  The locator is a m4.xlarge instance and the cache
+servers and ETL server are r3.2xlarge instance.  All support and are using
+enhanced networking and EBS optimization.
 
 
 ###Prerequesites###
@@ -43,12 +46,69 @@ access to all EC2 operations.  The following policy definition can be used.
         ]
 }
     ```
+
+### About Storage ###
+This tool supports both EBS storage and ephemeral storage.  The snippet below
+shows a server with one EBS volume and one ephemeral volume.
+
+```json
+        ...
+        {
+            "Name" : "CacheServer1",
+            "ImageId" : "ami-6869aa05",
+            "InstanceType" : "r3.2xlarge",
+            "ServerNumber" : 111,
+            "SSHUser" : "ec2-user",
+            "BlockDevices" : [
+                {
+                    "Size": 500,
+                    "Device" : "/dev/xvdf",
+                    "MountPoint" : "/data",
+                    "Owner" : "ec2-user",
+                    "FSType" : "ext4",
+                    "DeviceType" : "EBS",
+                    "EBSVolumeType" : "st1"
+                },
+                {
+                    "Device" : "/dev/xvdb",
+                    "MountPoint" : "/runtime",
+                    "Owner" : "ec2-user",
+                    "FSType" : "ext4",
+                    "DeviceType" : "Ephemeral"
+                }
+            ],
+            ...
+        }
+        ...
+```
+As you can see, it is possible to configure the mount point, the file system
+type, and for EBS volumes, the EBS type (e.g. throughput optimized,
+general purpose, etc.).
+
+__Since EBS Volumes are meant to outlive the instances they are attached to,
+EBS Volumes are automatically provisioned as a separate stack__.  This allows
+you to completely destroy the main stack while preserving the storage.  When
+EBS Volumes are mounted, the _setup.py_ script checks for an existing file
+system before formatting the volume.  If a file system exists, it is mounted
+without formatting.
  
+###_aws_provision_storage.py_###
+
+usage: `python3 aws_provision_storage.py`
+
+This script scans _env.json_ for EBS Volumes and creates them in a stack named
+_ENVIRONMENT\_NAME_ + Storage.  For example, if you're environment is called
+_Demo_, a stack named _DemoStorage_ will be created by _aws_provision_storage.py_.
+This stack will contain all of your EBS Volumes. __Deleting this stack will delete
+your persistent data.__
+
 ###_aws_provision.py_###
 
 usage: `python3 aws_provision.py`
 
-_aws_provision_.py generates a Cloud Formation template based on the main
+__If you have EBS volumes defined, you must run _aws_provision_storage.py_ first__.
+
+_aws_provision_.py generates and deploys Cloud Formation template based on the main
 configuration file, _env.json_ and a jinja2 template: _cloudformation.json.tpl_.
 All of the details of how the servers are provisioned on AWS can be modified
 by editing _cloudformation.json.tpl_.
@@ -122,6 +182,12 @@ provided above.
     a prefix for all of the cloud formation entities as well as the name of the
     stack that is created.
 
+5. Provision the storage:
+
+    ```
+    python3 aws_provision_storage.py
+    ```
+    
 5. Provision the cluster machines:
     ```
     python3 aws_provision.py 
@@ -133,12 +199,14 @@ provided above.
     python3 setup.py
     ```
 
-7. Start the cluster. Copy _InstallGemFireCluster/cluster.json_ to the _gemfire_manager_ folder
- containing the _gf.py_ and the other cluster control scripts.
- ```
- cd <gemfire-manager-location>
- python gf.py start
- ```
+7. Start the cluster.
+
+    Copy _InstallGemFireCluster/cluster.json_ to the _gemfire_manager_ folder
+    containing the _gf.py_ and the other cluster control scripts.
+    ```
+    cd <gemfire-manager-location>
+    python gf.py start
+    ```
 
   Done!  You now have a fully functional gemfire cluster on AWS.
 
