@@ -124,13 +124,14 @@ if __name__ == '__main__':
     with open('env.json', 'r') as contextFile:
         context = json.load(contextFile)
 
-    with open('storage.json','r') as f:
-        storageTable = json.load(f)
-
-    for server in context['Servers']:        
-        for blockDevice in server['BlockDevices']:
-            if blockDevice['DeviceType'] == 'EBS':
-                blockDevice['EBSVolumeId'] = storageTable[server['Name']][blockDevice['Device']]
+    if os.path.exists('storage.json'):
+        with open('storage.json','r') as f:
+            storageTable = json.load(f)
+    
+        for server in context['Servers']:        
+            for blockDevice in server['BlockDevices']:
+                if blockDevice['DeviceType'] == 'EBS':
+                    blockDevice['EBSVolumeId'] = storageTable[server['Name']][blockDevice['Device']]
         
     here = os.path.dirname(sys.argv[0])
     if len(here) == 0:
