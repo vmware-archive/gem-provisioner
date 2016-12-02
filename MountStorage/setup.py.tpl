@@ -30,6 +30,16 @@ def hasFileSystem(deviceName):
     
     return result
     
+def isMounted(deviceName):
+     mountOutput = subprocess.check_output(['mount'])
+     result = False
+     for line in mountOutput.splitlines():
+          if line.lower().find(deviceName.lower()) != -1:
+               result = True
+               break
+          
+     return result
+    
 if __name__ == '__main__':
     {% for device in Servers[ServerNum].BlockDevices %}
     ip = '{{ Servers[ServerNum].PublicIPAddress }}'
@@ -52,6 +62,9 @@ if __name__ == '__main__':
         {# TODO do we need to edit fstab to make it permanent ?
              or will we always run setup again when a box is restarted #}
              
+        if isMounted('{{ device.Device }}'):
+          runQuietly('umount',  '{{ device.Device }}')  # some AMI will automatically mount ephemeral devices
+          
         {% if device.FSType is defined %}
         runQuietly('mount', '-t', '{{ device.FSType }}', '{{ device.Device }}',mountPoint)
         {% else %}
