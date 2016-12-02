@@ -135,15 +135,11 @@ if __name__ == '__main__':
     
     # set up boto2 clients for ec2 and cloudformation
     ec2 = boto3.client('ec2',
-                       region_name=context['RegionName'],
-                       aws_access_key_id = context['AWSAccessKeyId'],
-                       aws_secret_access_key = context['AWSSecretAccessKey'])
+                       region_name=context['RegionName'])
  
     
     cf = boto3.client('cloudformation',
-                       region_name=context['RegionName'],
-                       aws_access_key_id = context['AWSAccessKeyId'],
-                       aws_secret_access_key = context['AWSSecretAccessKey'])
+                       region_name=context['RegionName'])
 
     stacks = cf.list_stacks()
     # TODO - currently not handling paginated results from this API!

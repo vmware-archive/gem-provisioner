@@ -25,9 +25,7 @@ if __name__ == '__main__':
 
     # set up boto2 clients for ec2 and cloudformation
     ec2 = boto3.client('ec2',
-                       region_name=context['RegionName'],
-                       aws_access_key_id = context['AWSAccessKeyId'],
-                       aws_secret_access_key = context['AWSSecretAccessKey'])
+                       region_name=context['RegionName'])
              
     # only returns running instances - its important to wait for everything
     # to be running or it could be skipped
