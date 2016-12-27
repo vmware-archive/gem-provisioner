@@ -72,7 +72,14 @@ if __name__ == '__main__':
             
         print '{0} gemfire toolkit installed in {1}'.format(ip, os.path.join(clusterHome,'gemtools'))
         
-    runQuietly('cp','/tmp/setup/cluster.json',clusterHome)
+    shutil.copy('/tmp/setup/cluster.json', clusterHome)
+    if os.path.exists('/tmp/setup/config'):
+      targetDir = os.path.join(clusterHome,'config')
+      if os.path.exists(targetDir):
+         shutil.rmtree(targetDir)
+         
+      shutil.copytree('/tmp/setup/config',targetDir)
+      
     runQuietly('chown', '-R', '{0}:{0}'.format('{{ Servers[ServerNum].SSHUser }}'), clusterHome)
     print '{0} copied cluster definition into {1}'.format(ip, clusterHome)
     
