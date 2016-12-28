@@ -7,7 +7,7 @@ import sys
 
 
 if __name__ == '__main__':
-   if len(sys.argv) != 2:
+   if len(sys.argv) < 2:
       sys.exit('Please provide a single target argument. e.g. ssh.py auser@aserver')
       
    target = sys.argv[1]
@@ -44,6 +44,10 @@ if __name__ == '__main__':
    
    target = user + '@' + serverIp
    
-   subprocess.check_call(['ssh','-o','StrictHostKeyChecking=no', '-o','UserKnownHostsFile=/dev/null','-i',keyFile, target])
+   cmd = ['ssh','-o','StrictHostKeyChecking=no', '-o','UserKnownHostsFile=/dev/null','-i',keyFile, target]
+   if len(sys.argv) > 2:
+      cmd = cmd + sys.argv[2:]
+      
+   subprocess.check_call(cmd)
       
    

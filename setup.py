@@ -62,6 +62,16 @@ def renderTemplate(directory, templateFile, context):
 #         msg = '"' + cmd + '" failed with the following output: \n\t' + output[0]
 #         raise Exception(msg)    
    
+def renderTemplatesInDir(context,dirname):
+    #print('rendering templates in {0}'.format(dirname))
+    for templateFile in os.listdir(dirname):
+        if os.path.isdir(os.path.join(dirname,templateFile)):
+            renderTemplatesInDir(context, os.path.join(dirname, templateFile))
+           
+        elif templateFile.endswith('.tpl'):
+            renderTemplate(dirname, templateFile, context)
+    
+
 if __name__ == '__main__':
     assert sys.version_info >= (3,0)
     
@@ -79,18 +89,16 @@ if __name__ == '__main__':
                                         
     serverNum = -1
     for server in context['Servers']:
-        serverName = context['EnvironmentName'] + 'Server' + server['Name']
+        serverName = server['Name']
         ip = ipTable[serverName]
         server['PublicIpAddress'] = ip
         serverNum += 1
         installationNum = -1
         for installation in server['Installations']:
             installationNum += 1
-            for templateFile in os.listdir(installation['Name']):
-                if templateFile.endswith('.tpl'):
-                    context['ServerNum'] = serverNum
-                    context['InstallationNum'] = installationNum
-                    renderTemplate(installation['Name'], templateFile, context)
+            context['ServerNum'] = serverNum
+            context['InstallationNum'] = installationNum            
+            renderTemplatesInDir(context, installation['Name'])
                     
             runQuietly('rsync', '-avz','--delete',
                 '-e' ,'ssh -o StrictHostKeyChecking=no -i {0}'.format(context['SSHKeyPath']),
@@ -100,5 +108,5 @@ if __name__ == '__main__':
                       'sudo', 'python','/tmp/setup/setup.py')
             
             runRemoteQuietly(context['SSHKeyPath'], server['SSHUser'], ip,
-                      'rm','-rf', '/tmp/setup')
+                     'rm','-rf', '/tmp/setup')
             

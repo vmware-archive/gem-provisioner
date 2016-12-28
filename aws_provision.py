@@ -203,7 +203,8 @@ if __name__ == '__main__':
         for instance in reservation['Instances']:
             for tag in instance['Tags']:
                 if tag['Key'] == 'Name':
-                    ipTable[tag['Value']] = instance['PublicIpAddress']
+                    shortName = tag['Value'][len(context['EnvironmentName'] + 'Server'):]
+                    ipTable[shortName] = instance['PublicIpAddress']
                     break
 
     with open('runtime.json', 'w') as runtimeFile:
