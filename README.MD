@@ -6,6 +6,7 @@ a VPC, Security Groups and multiple other resources.
 * _setup.py_ : Install a GemFire cluster onto a set of hosts in a way that allows the
 cluster to be managed using the _gemfire-manager_ project: https://github.com/Pivotal-Data-Engineering/gemfire-manager.
 
+
 There is a clean separation between the 2 functions so that the second function,
 cluster setup, can be used with any hosts, not just those provisioned using this
 project.  It is anticipated that additional provisioners may be added for
