@@ -1,4 +1,4 @@
-### Overview ###
+<h1> VMware has ended active development of this project, this repository will no longer be updated.</h1><br>### Overview ###
 This project has 2 functions.
 * _aws\_provision\_storage.py_ and _aws\_provision.py_ : Provision and configure
 AWS resources for a GemFire cluster.  This includes EBS Volumes, ec2 instances,
